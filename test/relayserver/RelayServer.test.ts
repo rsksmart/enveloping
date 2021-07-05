@@ -369,7 +369,7 @@ contract('RelayServer', function (accounts) {
       await env.relayServer.txStoreManager.clearAll()
     })
 
-    it('should relay transaction', async function () {
+    it.only('should relay transaction', async function () {
       const req = await env.createRelayHttpRequest()
       assert.equal((await env.relayServer.txStoreManager.getAll()).length, 0)
       await env.relayServer.createRelayTransaction(req)
