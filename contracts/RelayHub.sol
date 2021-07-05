@@ -13,6 +13,7 @@ import "./utils/Eip712Library.sol";
 import "./interfaces/EnvelopingTypes.sol";
 import "./interfaces/IRelayHub.sol";
 import "./interfaces/IForwarder.sol";
+import "./interfaces/IPenalizer.sol";
 
 contract RelayHub is IRelayHub {
     using SafeMath for uint256;
@@ -243,8 +244,8 @@ contract RelayHub is IRelayHub {
             );
         }
 
-        (bool success, ) = penalizer.call(abi.encodeWithSignature("fulfill(bytes)", signature));
-        require(success, "Penalizer fulfill call failed");
+        IPenalizer penalizerContract = IPenalizer(penalizer);
+        penalizerContract.fulfill(signature);
     }
 
     modifier penalizerOnly() {
