@@ -42,6 +42,7 @@ import EnvelopingTransactionDetails from '../relayclient/types/EnvelopingTransac
 import { toBN, toHex } from 'web3-utils'
 import BN from 'bn.js'
 import { DeployTransactionRequest, RelayTransactionRequest } from '../relayclient/types/RelayTransactionRequest'
+import { RelayData } from '../relayclient/types/RelayData'
 
 // Truffle Contract typings seem to be completely out of their minds
 import TruffleContract = require('@truffle/contract')
@@ -467,6 +468,28 @@ export default class ContractInteractor {
     // @ts-ignore
     const relayHub = new this.IRelayHubContract('')
     return relayHub.contract.methods.deployCall(relayRequest, sig).encodeABI()
+  }
+
+  async getActiveRelays (relayManagers: Set<Address> | Address[]): Promise<RelayData[]> {
+    const managers: Address[] = Array.from(relayManagers)
+    const contractCalls: Array<Promise<RelayData>> = []
+    managers.forEach(managerAddress => {
+      contractCalls.push(this.relayHubInstance.getRelayData(managerAddress))
+    })
+    const results = await Promise.all(contractCalls)
+    return results.filter(relayData =>
+      !relayData.penalized &&
+        relayData.stakeAdded &&
+        relayData.registered)
+  }
+
+  async getRelayData (relayManagers: Set<Address> | Address[]): Promise<RelayData[]> {
+    const managers: Address[] = Array.from(relayManagers)
+    const contractCalls: Array<Promise<RelayData>> = []
+    managers.forEach(managerAddress => {
+      contractCalls.push(this.relayHubInstance.getRelayData(managerAddress))
+    })
+    return await Promise.all(contractCalls)
   }
 
   async getPastEventsForHub (extraTopics: string[], options: PastEventOptions, names: EventName[] = ActiveManagerEvents): Promise<EventData[]> {

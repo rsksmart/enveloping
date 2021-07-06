@@ -107,6 +107,18 @@ interface IRelayHub {
 
     function isRelayManagerStaked(address relayManager) external view returns(bool);
 
+    // get the relay data from the manager address
+    function getRelayData(address relayManager) external view returns(RelayData memory relayInfo);
+
+    // Represents the relay data for the relay
+    struct RelayData {
+        address manager;
+        bool penalized;
+        bool stakeAdded;
+        bool registered;
+        string url;
+    }
+
     function versionHub() external view returns (string memory);
 
     /// Emitted when a stake or unstakeDelay are initialized or increased

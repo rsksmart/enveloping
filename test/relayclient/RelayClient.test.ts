@@ -824,9 +824,12 @@ gasOptions.forEach(gasOption => {
           version: ''
         }
         relayInfo = {
-          relayInfo: {
-            relayManager,
-            relayUrl
+          relayData: {
+            manager: relayManager,
+            url: relayUrl,
+            penalized: false,
+            registered: false,
+            stakeAdded: false
           },
           pingResponse
         }

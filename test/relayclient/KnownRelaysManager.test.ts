@@ -13,11 +13,11 @@ import {
 import { deployHub, evmMineMany, startRelay, stopRelay, getTestingEnvironment, createSmartWalletFactory, createSmartWallet, getGaslessAccount, prepareTransaction } from '../TestUtils'
 import sinon from 'sinon'
 import { ChildProcessWithoutNullStreams } from 'child_process'
-import { RelayRegisteredEventInfo } from '../../src/relayclient/types/RelayRegisteredEventInfo'
 import { Environment } from '../../src/common/Environments'
 import { constants } from '../../src/common/Constants'
 import { AccountKeypair } from '../../src/relayclient/AccountManager'
 import EnvelopingTransactionDetails from '../../src/relayclient/types/EnvelopingTransactionDetails'
+import { RelayData } from '../../src/relayclient/types/RelayData'
 
 const TestVerifierConfigurableMisbehavior = artifacts.require('TestVerifierConfigurableMisbehavior')
 const TestRecipient = artifacts.require('TestRecipient')
@@ -223,31 +223,32 @@ contract('KnownRelaysManager 2', function (accounts) {
       const preferredRelays = knownRelaysManager.preferredRelayers
       const activeRelays = knownRelaysManager.allRelayers
       assert.equal(preferredRelays.length, 1)
-      assert.equal(preferredRelays[0].relayUrl, 'http://localhost:8090')
-      assert.equal(activeRelays.length, 3)
-      assert.equal(activeRelays[0].relayUrl, 'http://localhost:8090')
-      assert.equal(activeRelays[1].relayUrl, 'stakeAndAuthorization1')
-      assert.equal(activeRelays[2].relayUrl, 'stakeAndAuthorization2')
+      assert.equal(preferredRelays[0].url, 'http://localhost:8090')
+      assert.equal(activeRelays.length, 4)
+      assert.equal(activeRelays[0].url, 'http://localhost:8090')
+      assert.equal(activeRelays[1].url, 'stakeAndAuthorization1')
+      assert.equal(activeRelays[2].url, 'stakeAndAuthorization2')
+      assert.equal(activeRelays[3].url, 'stakeUnlocked')
     })
 
     it('should use \'relayFilter\' to remove unsuitable relays', async function () {
-      const relayFilter = (registeredEventInfo: RelayRegisteredEventInfo): boolean => {
-        return registeredEventInfo.relayUrl.includes('2')
+      const relayFilter = (registeredEventInfo: RelayData): boolean => {
+        return registeredEventInfo.url.includes('2')
       }
       const knownRelaysManagerWithFilter = new KnownRelaysManager(contractInteractor, config, relayFilter)
       await knownRelaysManagerWithFilter.refresh()
       const relays = knownRelaysManagerWithFilter.allRelayers
       assert.equal(relays.length, 1)
-      assert.equal(relays[0].relayUrl, 'stakeAndAuthorization2')
+      assert.equal(relays[0].url, 'stakeAndAuthorization2')
     })
   })
 
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
   describe('#getRelaysSortedForTransaction()', function () {
-    const relayInfo = {
-      relayManager: accounts[0],
-      relayUrl: 'url'
-    }
+    const relayData: RelayData = Object.assign({} as any, {
+      manager: accounts[0],
+      url: 'url'
+    })
 
     describe('#_refreshFailures()', function () {
       let knownRelaysManager: KnownRelaysManager
@@ -368,9 +369,9 @@ contract('KnownRelaysManager 2', function (accounts) {
         relayUrl: 'url3'
       }
       it('should subtract penalty from a relay for each known failure', async function () {
-        const relayScoreNoFailures = await DefaultRelayScore(relayInfo, transactionDetails, [])
-        const relayScoreOneFailure = await DefaultRelayScore(relayInfo, transactionDetails, [failure])
-        const relayScoreTenFailures = await DefaultRelayScore(relayInfo, transactionDetails, Array(10).fill(failure))
+        const relayScoreNoFailures = await DefaultRelayScore(relayData, transactionDetails, [])
+        const relayScoreOneFailure = await DefaultRelayScore(relayData, transactionDetails, [failure])
+        const relayScoreTenFailures = await DefaultRelayScore(relayData, transactionDetails, Array(10).fill(failure))
 
         assert.isAbove(relayScoreNoFailures, relayScoreOneFailure)
         assert.isAbove(relayScoreOneFailure, relayScoreTenFailures)
@@ -380,8 +381,8 @@ contract('KnownRelaysManager 2', function (accounts) {
 
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
   describe('getRelaysSortedForTransaction', function () {
-    const biasedRelayScore = async function (relay: RelayRegisteredEventInfo): Promise<number> {
-      if (relay.relayUrl === 'alex') {
+    const biasedRelayScore = async function (relay: RelayData): Promise<number> {
+      if (relay.url === 'alex') {
         return await Promise.resolve(1000)
       } else {
         return await Promise.resolve(100)
@@ -393,25 +394,34 @@ contract('KnownRelaysManager 2', function (accounts) {
       const env = await getTestingEnvironment()
       knownRelaysManager = new KnownRelaysManager(
         contractInteractor, configure({ chainId: env.chainId }), undefined, biasedRelayScore)
-      const activeRelays: RelayRegisteredEventInfo[] = [{
-        relayManager: accounts[0],
-        relayUrl: 'alex'
+      const activeRelays: RelayData[] = [{
+        manager: accounts[0],
+        url: 'alex',
+        penalized: false,
+        stakeAdded: true,
+        registered: true
       }, {
-        relayManager: accounts[0],
-        relayUrl: 'joe'
+        manager: accounts[0],
+        url: 'joe',
+        penalized: false,
+        stakeAdded: true,
+        registered: true
       }, {
-        relayManager: accounts[1],
-        relayUrl: 'joe'
+        manager: accounts[1],
+        url: 'joe',
+        penalized: false,
+        stakeAdded: true,
+        registered: true
       }]
       sinon.stub(knownRelaysManager, 'allRelayers').value(activeRelays)
     })
 
     it('should use provided score calculation method to sort the known relays', async function () {
-      const sortedRelays = (await knownRelaysManager.getRelaysSortedForTransaction(transactionDetails)) as RelayRegisteredEventInfo[][]
-      assert.equal(sortedRelays[1][0].relayUrl, 'alex')
+      const sortedRelays = (await knownRelaysManager.getRelaysSortedForTransaction(transactionDetails))
+      assert.equal(sortedRelays[1][0].url, 'alex')
       // checking the relayers are sorted AND they cannot overshadow each other's url
-      assert.equal(sortedRelays[1][1].relayUrl, 'joe')
-      assert.equal(sortedRelays[1][2].relayUrl, 'joe')
+      assert.equal(sortedRelays[1][1].url, 'joe')
+      assert.equal(sortedRelays[1][2].url, 'joe')
     })
   })
 })

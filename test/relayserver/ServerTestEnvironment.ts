@@ -23,7 +23,6 @@ import { KeyManager } from '../../src/relayserver/KeyManager'
 import { PrefixedHexString } from 'ethereumjs-tx'
 import { RelayClient } from '../../src/relayclient/RelayClient'
 import { RelayInfo } from '../../src/relayclient/types/RelayInfo'
-import { RelayRegisteredEventInfo } from '../../src/relayclient/types/RelayRegisteredEventInfo'
 import { RelayServer } from '../../src/relayserver/RelayServer'
 import { ServerConfigParams } from '../../src/relayserver/ServerConfigParams'
 import { TxStoreManager } from '../../src/relayserver/TxStoreManager'
@@ -37,6 +36,7 @@ import DeployVerifierABI from '../../src/common/interfaces/IDeployVerifier.json'
 
 import { RelayHubConfiguration } from '../../src/relayclient/types/RelayHubConfiguration'
 import { ether } from '@openzeppelin/test-helpers'
+import { RelayData } from '../../src/relayclient/types/RelayData'
 
 const TestRecipient = artifacts.require('TestRecipient')
 const TestVerifierEverythingAccepted = artifacts.require('TestVerifierEverythingAccepted')
@@ -204,13 +204,16 @@ export class ServerTestEnvironment {
       relayHubAddress: this.relayHub.address,
       relayWorkerAddress: this.relayServer.workerAddress
     }
-    const eventInfo: RelayRegisteredEventInfo = {
-      relayManager: '',
-      relayUrl: ''
+    const relayData: RelayData = {
+      manager: '',
+      penalized: false,
+      url: '',
+      stakeAdded: false,
+      registered: false
     }
     const relayInfo: RelayInfo = {
       pingResponse: pingResponse as PingResponse,
-      relayInfo: eventInfo
+      relayData: relayData
     }
 
     let transactionDetails: EnvelopingTransactionDetails = {

@@ -187,6 +187,14 @@ contract('StakeManagement', function ([_, relayManager, worker, anyRelayHub, own
         value: initialStake,
         from: owner
       })
+
+      await relayHub.addRelayWorkers(['0x7701f65207DcabA47EbD7826315A47Ec1C6B243d'], {
+        from: relayManager
+      })
+
+      await relayHub.registerRelayServer('somerelayurl', {
+        from: relayManager
+      })
     })
 
     it('should report relayManager stake as valid for the authorized hub', async function () {
@@ -221,6 +229,15 @@ contract('StakeManagement', function ([_, relayManager, worker, anyRelayHub, own
         value: initialStake,
         from: owner
       })
+
+      await relayHub.addRelayWorkers(['0x7701f65207DcabA47EbD7826315A47Ec1C6B243d'], {
+        from: relayManager
+      })
+
+      await relayHub.registerRelayServer('somerelayurl', {
+        from: relayManager
+      })
+
       await relayHub.unlockStake(relayManager, { from: owner })
     })
 
