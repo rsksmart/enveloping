@@ -21,6 +21,8 @@ export class Commitment {
   data: PrefixedHexString
   relayHubAddress: Address
   relayWorker: Address
+  enableQos: boolean
+  signature: PrefixedHexString
 
   constructor (
     time: Number,
@@ -28,7 +30,9 @@ export class Commitment {
     to: Address,
     data: PrefixedHexString,
     relayHubAddress: Address,
-    relayWorker: Address
+    relayWorker: Address,
+    enableQos: boolean,
+    signature: PrefixedHexString
   ) {
     this.time = time
     this.from = from
@@ -36,9 +40,11 @@ export class Commitment {
     this.data = data
     this.relayHubAddress = relayHubAddress
     this.relayWorker = relayWorker
+    this.enableQos = enableQos
+    this.signature = signature
   }
 
-  public static TypeEncoding = 'commit(uint,address,address,bytes,address,address)'
+  public static TypeEncoding = 'commit(uint,address,address,bytes,address,address,bool)'
 
   orderForEnc (): any[] {
     return [
@@ -47,7 +53,8 @@ export class Commitment {
       this.to,
       this.data,
       this.relayHubAddress,
-      this.relayWorker
+      this.relayWorker,
+      this.enableQos
     ]
   }
 

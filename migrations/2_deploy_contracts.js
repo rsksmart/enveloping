@@ -18,6 +18,12 @@ const CustomSmartWalletDeployVerifier = artifacts.require('CustomSmartWalletDepl
 module.exports = async function (deployer) {
   await deployer.deploy(Penalizer)
   await deployer.deploy(RelayHub, Penalizer.address, 4, 4, 4, 4)
+
+  const penalizer = await new web3.eth.Contract(Penalizer.abi, Penalizer.address)
+  const penalizerOwner = await penalizer.methods.owner().call()
+  await penalizer.methods.setHub(RelayHub.address).send({from: penalizerOwner})
+  const hub = await penalizer.methods.getHub().call()
+
   await deployer.deploy(SmartWallet)
   await deployer.deploy(SmartWalletFactory, SmartWallet.address)
   await deployer.deploy(DeployVerifier, SmartWalletFactory.address)

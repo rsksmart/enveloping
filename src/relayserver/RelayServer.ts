@@ -160,6 +160,14 @@ export class RelayServer extends EventEmitter {
     return res
   }
 
+  // temp
+  async penalizerHandler (penalizer: Address, signature: PrefixedHexString): Promise<any> {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const penalizerInstance = await this.contractInteractor.createPenalizer(penalizer)
+    const transactionFulfilled = await penalizerInstance.fulfilled(signature)
+    return { transactionFulfilled: transactionFulfilled }
+  }
+
   async verifierHandler (): Promise<VerifierResponse> {
     return {
       trustedVerifiers: Array.from(this.trustedVerifiers) as Address[]
@@ -368,7 +376,9 @@ export class RelayServer extends EventEmitter {
       req.relayRequest.request.to,
       req.relayRequest.request.data,
       req.metadata.relayHubAddress,
-      req.relayRequest.relayData.relayWorker
+      req.relayRequest.relayData.relayWorker,
+      req.relayRequest.request.enableQos,
+      req.metadata.signature
     )
     const digest = ethers.utils.keccak256(commitment.encodeForSign(this.relayHubContract.address))
     const signature = await this.envelopingArbiter.signCommitment(this.transactionManager, commitment.relayWorker, ethers.utils.arrayify(digest))

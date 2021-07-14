@@ -183,14 +183,17 @@ contract RelayHub is IRelayHub {
                 )
             }
         }
+
+        if (deployRequest.request.enableQos == true){
+            (bool success, ) = penalizer.call(abi.encodeWithSignature("fulfill(bytes)", signature));
+            require(success, "Penalizer fulfill call failed");
+        }
     }
 
     function relayCall(
         EnvelopingTypes.RelayRequest calldata relayRequest,
         bytes calldata signature
     ) external override returns (bool destinationCallSuccess){
-        (signature);
-
         require(msg.sender == tx.origin, "RelayWorker cannot be a contract");
         require(
             msg.sender == relayRequest.relayData.relayWorker,
@@ -243,6 +246,11 @@ contract RelayHub is IRelayHub {
                 keccak256(signature),
                 relayedCallReturnValue
             );
+        }
+
+        if (relayRequest.request.enableQos == true){
+            (bool success, ) = penalizer.call(abi.encodeWithSignature("fulfill(bytes)", signature));
+            require(success, "Penalizer fulfill call failed");
         }
     }
 

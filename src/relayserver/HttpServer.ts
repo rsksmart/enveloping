@@ -6,6 +6,7 @@ import { RelayServer } from './RelayServer'
 import { Server } from 'http'
 import log from 'loglevel'
 import { Address } from '../relayclient/types/Aliases'
+import { PrefixedHexString } from 'ethereumjs-tx'
 
 export class HttpServer {
   app: Express
@@ -131,6 +132,20 @@ export class HttpServer {
       const message: string = e.message
       res.send({ message })
       log.error(`verified handler rejected: ${message}`)
+    }
+  }
+
+  // temp
+  async penalizerHandler (req: Request, res: Response): Promise<void> {
+    try {
+      const penalizerAddress = req.query.penalizer as Address
+      const signature = req.query.signature as PrefixedHexString
+      const penalizerResponse = await this.backend.penalizerHandler(penalizerAddress, signature)
+      res.send(penalizerResponse)
+    } catch (e) {
+      const message: string = e.message
+      res.send({ message })
+      log.error(`penalizer handler rejected: ${message}`)
     }
   }
 

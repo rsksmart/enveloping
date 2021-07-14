@@ -2,6 +2,7 @@
 pragma solidity ^0.6.12;
 pragma experimental ABIEncoderV2;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/cryptography/ECDSA.sol";
 
 import "./utils/RLPReader.sol";
@@ -9,11 +10,14 @@ import "./utils/RSKAddrValidator.sol";
 import "./interfaces/IRelayHub.sol";
 import "./interfaces/IPenalizer.sol";
 
-contract Penalizer is IPenalizer{
+contract Penalizer is IPenalizer, Ownable {
 
     string public override versionPenalizer = "2.0.1+enveloping.penalizer.ipenalizer";
     
     mapping(bytes32 => bool) public penalizedTransactions;
+    mapping(bytes32 => bool) public fulfilledTransactions;
+
+    address private hub;
 
     using ECDSA for bytes32;
 
@@ -27,9 +31,17 @@ contract Penalizer is IPenalizer{
         return transaction;
     }
 
-    modifier relayManagerOnly(IRelayHub hub) {
-        require(hub.isRelayManagerStaked(msg.sender), "Unknown relay manager");
+    modifier relayManagerOnly(IRelayHub relayHub) {
+        require(relayHub.isRelayManagerStaked(msg.sender), "Unknown relay manager");
         _;
+    }
+
+    function setHub(address relayHub) public override onlyOwner{
+        hub = relayHub;
+    }
+
+    function getHub() external override view returns (address){
+        return hub;
     }
 
     function penalizeRepeatedNonce(
@@ -37,11 +49,11 @@ contract Penalizer is IPenalizer{
         bytes memory signature1,
         bytes memory unsignedTx2,
         bytes memory signature2,
-        IRelayHub hub
+        IRelayHub relayHub
     )
     public
     override
-    relayManagerOnly(hub)
+    relayManagerOnly(relayHub)
     {
         // Can be called by a relay manager only.
         // If a relay attacked the system by signing multiple transactions with the same nonce
@@ -85,6 +97,86 @@ contract Penalizer is IPenalizer{
         penalizedTransactions[txHash1] = true;
         penalizedTransactions[txHash2] = true;
 
-        hub.penalize(addr1, msg.sender);
+        relayHub.penalize(addr1, msg.sender);
+    }
+
+    modifier relayHubOnly() {
+        require(msg.sender == hub, "Unknown Relay Hub");
+        _;
+    }
+
+    function fulfill(bytes memory txSignature) external override relayHubOnly() {
+        bytes32 txId = keccak256(txSignature);
+        require(!fulfilledTransactions[txId], "Transaction already fulfilled");
+        fulfilledTransactions[txId] = true;
+    }
+
+    function fulfilled(bytes calldata txSignature) external view override returns (bool){
+        return fulfilledTransactions[keccak256(txSignature)];
+    }
+
+    function claim(CommitmentReceipt calldata commitmentReceipt) external override {
+        require(hub != address(0), "Relay Hub not set");
+
+        // check if the commitment has enabled qos
+        require(commitmentReceipt.commitment.enableQos, "This commitment has not enabled QOS");
+
+        // check the worker address and the signature
+        address workerAddress = commitmentReceipt.workerAddress;
+        bytes memory workerSignature = commitmentReceipt.workerSignature;
+        bytes32 commitmentHash = keccak256(abi.encodePacked(commitmentReceipt.commitment.time, commitmentReceipt.commitment.from, commitmentReceipt.commitment.to, commitmentReceipt.commitment.data, commitmentReceipt.commitment.relayHubAddress, commitmentReceipt.commitment.relayWorker, commitmentReceipt.commitment.enableQos));
+
+        require(recoverSigner(commitmentHash, workerSignature) == workerAddress, "This commitment is not signed by the specified worker");
+        require(workerAddress == commitmentReceipt.commitment.relayWorker, "The worker address in the receipt is not the same as the commitment");
+        // we should check the address of the hub here to check if the specified hub is the same
+        // but we need the hub instance (probably we need it on the constructor)
+        // require(commitmentReceipt.commitment.relayHubAddress == hub.address)
+
+        // check if the claimer is who made the relay transaction and not other
+        require(msg.sender == commitmentReceipt.commitment.from, "Only the original sender can claim a commitment");
+
+        // check if the time has past or not
+
+        require(commitmentReceipt.commitment.time <= block.timestamp, "The time you agreed to wait is not due yet, this claim is not valid");
+
+        // check if the transaction have been executed or not
+        bytes32 txId = keccak256(commitmentReceipt.commitment.signature);
+
+        if (fulfilledTransactions[txId]) {
+            // tx was executed
+            // TODO next iteration: check if the transaction was executed in time
+        } else {
+            // tx was not executed so we should probably penalize the manager here
+        }
+        // we should return something to show the outcome of the claim call (manager was penalized or not?)
+    }
+
+    function splitSignature(bytes memory signature) internal pure returns (uint8, bytes32, bytes32) {
+        require(signature.length == 65);
+
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+
+        assembly {
+            // first 32 bytes, after the length prefix
+            r := mload(add(signature, 32))
+            // second 32 bytes
+            s := mload(add(signature, 64))
+            // final byte (first byte of the next 32 bytes)
+            v := byte(0, mload(add(signature, 96)))
+        }
+
+        return (v, r, s);
+    }
+
+    function recoverSigner(bytes32 message, bytes memory signature) internal pure returns (address) {
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+
+        (v, r, s) = splitSignature(signature);
+
+        return ecrecover(message, v, r, s);
     }
 }
